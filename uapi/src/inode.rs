@@ -69,9 +69,10 @@ pub fn lookup_path_rootid(fd: BorrowedFd<'_>) -> nix::Result<u64> {
 pub fn ino_paths(fd: BorrowedFd<'_>, inum: u64) -> nix::Result<Vec<String>> {
     const PATH_MAX: usize = 4096;
 
-    // First, allocate a buffer for the response
-    // The buffer needs to be large enough to hold btrfs_data_container plus the path data
-    let mut buf = vec![0u8; PATH_MAX];
+    // Allocate a buffer with proper alignment for btrfs_data_container.
+    // Using u64 ensures 8-byte alignment required for the container's val[] field.
+    let num_u64s = (PATH_MAX + std::mem::size_of::<u64>() - 1) / std::mem::size_of::<u64>();
+    let mut buf = vec![0u64; num_u64s];
 
     // Set up the ioctl arguments
     let mut args = crate::raw::btrfs_ioctl_ino_path_args {
@@ -85,12 +86,10 @@ pub fn ino_paths(fd: BorrowedFd<'_>, inum: u64) -> nix::Result<Vec<String>> {
         btrfs_ioc_ino_paths(fd.as_raw_fd(), &raw mut args)?;
     }
 
-    // Parse the results from the data container
-    // The buffer is laid out as: btrfs_data_container header, followed by val[] array
-    // SAFETY: buf is u64-aligned from the Vec<u8> allocation, and the ioctl
-    // populated it as a btrfs_data_container. The cast is safe because the
-    // buffer was allocated with at least PATH_MAX bytes.
-    #[allow(clippy::cast_ptr_alignment)]
+    // Parse the results from the data container.
+    // SAFETY: buf is properly aligned (u64-aligned) for btrfs_data_container,
+    // and the ioctl populated it correctly. The buffer was allocated with
+    // sufficient size for PATH_MAX bytes.
     let container =
         unsafe { &*buf.as_ptr().cast::<crate::raw::btrfs_data_container>() };
 
@@ -159,8 +158,12 @@ pub fn logical_ino(
     const DEFAULT_BUFSIZE: u64 = 64 * 1024; // 64KB
 
     let size = std::cmp::min(bufsize.unwrap_or(DEFAULT_BUFSIZE), MAX_BUFSIZE);
+
+    // Allocate a buffer with proper alignment for btrfs_data_container.
+    // Using u64 ensures 8-byte alignment required for the container's val[] field.
     #[allow(clippy::cast_possible_truncation)] // buffer size fits in usize
-    let mut buf = vec![0u8; size as usize];
+    let num_u64s = ((size as usize) + std::mem::size_of::<u64>() - 1) / std::mem::size_of::<u64>();
+    let mut buf = vec![0u64; num_u64s];
 
     // Set up flags for v2 ioctl
     let mut flags = 0u64;
@@ -182,8 +185,9 @@ pub fn logical_ino(
     }
 
     // Parse the results from the data container.
-    // SAFETY: buf is correctly sized and was populated by the ioctl.
-    #[allow(clippy::cast_ptr_alignment)]
+    // SAFETY: buf is properly aligned (u64-aligned) for btrfs_data_container,
+    // and the ioctl populated it correctly. The buffer was allocated with
+    // sufficient size.
     let container =
         unsafe { &*buf.as_ptr().cast::<crate::raw::btrfs_data_container>() };
 
