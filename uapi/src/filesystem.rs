@@ -105,6 +105,10 @@ pub fn wait_sync(fd: BorrowedFd, transid: u64) -> nix::Result<()> {
 pub fn label_get(fd: BorrowedFd) -> nix::Result<CString> {
     let mut buf = [0 as c_char; BTRFS_LABEL_SIZE as usize];
     unsafe { btrfs_ioc_get_fslabel(fd.as_raw_fd(), &raw mut buf) }?;
+    // Ensure the buffer is NUL-terminated before constructing a CStr.
+    // While the kernel currently guarantees NUL termination, CStr::from_ptr
+    // requires the caller to uphold this invariant.
+    buf[BTRFS_LABEL_SIZE as usize - 1] = 0;
     let cstr = unsafe { CStr::from_ptr(buf.as_ptr()) };
     // CStr::to_owned() copies the bytes into a freshly allocated CString,
     // which is safe to return after `buf` goes out of scope.
