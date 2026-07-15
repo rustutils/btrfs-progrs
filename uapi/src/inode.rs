@@ -94,10 +94,16 @@ pub fn ino_paths(fd: BorrowedFd<'_>, inum: u64) -> nix::Result<Vec<String>> {
     let container =
         unsafe { &*buf.as_ptr().cast::<crate::raw::btrfs_data_container>() };
 
+    // Validate elem_cnt against buffer capacity to prevent out-of-bounds access.
+    // The btrfs_data_container header is 16 bytes (4 x u32), followed by val[] array of u64.
+    // Maximum valid elem_cnt = (buf.len() - 16) / 8
+    let max_elem_cnt = buf.len().saturating_sub(16) / std::mem::size_of::<u64>();
+    let elem_cnt = std::cmp::min(container.elem_cnt as usize, max_elem_cnt);
+
     let mut paths = Vec::new();
 
     // Each element in val[] is an offset into the data buffer where a path string starts
-    for i in 0..container.elem_cnt as usize {
+    for i in 0..elem_cnt {
         // Get the offset from val[i]
         #[allow(clippy::cast_possible_truncation)] // offsets fit in usize
         let val_offset = unsafe {
@@ -187,11 +193,17 @@ pub fn logical_ino(
     let container =
         unsafe { &*buf.as_ptr().cast::<crate::raw::btrfs_data_container>() };
 
+    // Validate elem_cnt against buffer capacity to prevent out-of-bounds access.
+    // The btrfs_data_container header is 16 bytes (4 x u32), followed by val[] array of u64.
+    // Maximum valid elem_cnt = (buf.len() - 16) / 8
+    let max_elem_cnt = buf.len().saturating_sub(16) / std::mem::size_of::<u64>();
+    let elem_cnt = std::cmp::min(container.elem_cnt as usize, max_elem_cnt);
+
     let mut results = Vec::new();
 
     // Each result is 3 consecutive u64 values: inum, offset, root
-    for i in (0..container.elem_cnt as usize).step_by(3) {
-        if i + 2 < container.elem_cnt as usize {
+    for i in (0..elem_cnt).step_by(3) {
+        if i + 2 < elem_cnt {
             let val_offset_inum = unsafe {
                 let val_ptr = container.val.as_ptr();
                 *val_ptr.add(i)
