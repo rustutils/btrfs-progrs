@@ -252,7 +252,7 @@ pub fn subvolid_resolve(
     subvol_id: u64,
 ) -> nix::Result<String> {
     let mut path = String::new();
-    subvolid_resolve_sub(fd, &mut path, subvol_id)?;
+    subvolid_resolve_sub(fd, &mut path, subvol_id, 0)?;
     Ok(path)
 }
 
@@ -260,8 +260,15 @@ fn subvolid_resolve_sub(
     fd: BorrowedFd<'_>,
     path: &mut String,
     subvol_id: u64,
+    depth: u32,
 ) -> nix::Result<()> {
     use crate::raw::BTRFS_FS_TREE_OBJECTID;
+
+    // Prevent unbounded recursion on corrupted filesystems with cyclic backrefs
+    const MAX_SUBVOL_DEPTH: u32 = 256;
+    if depth > MAX_SUBVOL_DEPTH {
+        return Err(nix::errno::Errno::ELOOP);
+    }
 
     // If this is the filesystem root, we're done (empty path means root)
     if subvol_id == u64::from(BTRFS_FS_TREE_OBJECTID) {
@@ -292,7 +299,7 @@ fn subvolid_resolve_sub(
             let parent_subvol_id = hdr.offset;
 
             // Recursively resolve the parent path first
-            subvolid_resolve_sub(fd, path, parent_subvol_id)?;
+            subvolid_resolve_sub(fd, path, parent_subvol_id, depth + 1)?;
 
             // data is a packed btrfs_root_ref followed by name bytes.
 
