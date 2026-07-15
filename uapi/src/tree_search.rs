@@ -330,7 +330,7 @@ pub fn tree_search_v2(
     let mut buf = vec![0u64; num_u64s];
 
     // SAFETY: buf is correctly sized and aligned for btrfs_ioctl_search_args_v2.
-    let args_ptr = buf.as_mut_ptr().cast::<btrfs_ioctl_search_args_v2>();
+    let mut args_ptr = buf.as_mut_ptr().cast::<btrfs_ioctl_search_args_v2>();
     unsafe {
         fill_search_key(&mut (*args_ptr).key, &filter);
     }
@@ -357,26 +357,19 @@ pub fn tree_search_v2(
                 let alloc_bytes = base_size + capacity;
                 let num_u64s = alloc_bytes.div_ceil(mem::size_of::<u64>());
                 buf.resize(num_u64s, 0);
-                // args_ptr must be refreshed after reallocation.
-                let args_ptr_new =
-                    buf.as_mut_ptr().cast::<btrfs_ioctl_search_args_v2>();
+                // Re-derive pointer after reallocation.
+                args_ptr = buf.as_mut_ptr().cast::<btrfs_ioctl_search_args_v2>();
                 unsafe {
-                    (*args_ptr_new).key.nr_items = ITEMS_PER_BATCH;
-                    (*args_ptr_new).buf_size = capacity as u64;
+                    (*args_ptr).key.nr_items = ITEMS_PER_BATCH;
+                    (*args_ptr).buf_size = capacity as u64;
                     btrfs_ioc_tree_search_v2(
                         fd.as_raw_fd(),
-                        &raw mut *args_ptr_new,
+                        &raw mut *args_ptr,
                     )?;
                 }
-                // Fall through to process results with the new pointer.
-                // Update our local for the rest of the loop.
-                let _ = args_ptr_new;
             }
             Err(e) => return Err(e),
         }
-
-        // Re-derive pointer after potential reallocation.
-        let args_ptr = buf.as_mut_ptr().cast::<btrfs_ioctl_search_args_v2>();
 
         let nr = unsafe { (*args_ptr).key.nr_items };
         if nr == 0 {
