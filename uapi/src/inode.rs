@@ -69,9 +69,11 @@ pub fn lookup_path_rootid(fd: BorrowedFd<'_>) -> nix::Result<u64> {
 pub fn ino_paths(fd: BorrowedFd<'_>, inum: u64) -> nix::Result<Vec<String>> {
     const PATH_MAX: usize = 4096;
 
-    // First, allocate a buffer for the response
-    // The buffer needs to be large enough to hold btrfs_data_container plus the path data
-    let mut buf = vec![0u8; PATH_MAX];
+    // Allocate a u64-aligned buffer for the response.
+    // btrfs_data_container contains u64 fields and requires proper alignment.
+    // We allocate in u64 units to ensure alignment, then treat as bytes for size.
+    let buf_u64_len = (PATH_MAX + std::mem::size_of::<u64>() - 1) / std::mem::size_of::<u64>();
+    let mut buf = vec![0u64; buf_u64_len];
 
     // Set up the ioctl arguments
     let mut args = crate::raw::btrfs_ioctl_ino_path_args {
@@ -87,10 +89,9 @@ pub fn ino_paths(fd: BorrowedFd<'_>, inum: u64) -> nix::Result<Vec<String>> {
 
     // Parse the results from the data container
     // The buffer is laid out as: btrfs_data_container header, followed by val[] array
-    // SAFETY: buf is u64-aligned from the Vec<u8> allocation, and the ioctl
-    // populated it as a btrfs_data_container. The cast is safe because the
-    // buffer was allocated with at least PATH_MAX bytes.
-    #[allow(clippy::cast_ptr_alignment)]
+    // SAFETY: buf is properly aligned for u64 access (Vec<u64> guarantees this),
+    // and the ioctl populated it as a btrfs_data_container. The cast is safe because
+    // the buffer was allocated with sufficient space.
     let container =
         unsafe { &*buf.as_ptr().cast::<crate::raw::btrfs_data_container>() };
 
