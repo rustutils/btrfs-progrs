@@ -56,6 +56,11 @@ pub fn file_extent_same(
 ) -> nix::Result<Vec<DedupeResult>> {
     let count = targets.len();
 
+    // The dest_count field is u16; validate targets.len() fits.
+    if count > u16::MAX as usize {
+        return Err(nix::errno::Errno::EINVAL);
+    }
+
     // Flexible array member pattern: allocate header + count info entries.
     let base_size = mem::size_of::<btrfs_ioctl_same_args>();
     let info_size = mem::size_of::<btrfs_ioctl_same_extent_info>();
@@ -70,11 +75,8 @@ pub fn file_extent_same(
         let args_ptr = buf.as_mut_ptr().cast::<btrfs_ioctl_same_args>();
         (*args_ptr).logical_offset = src_offset;
         (*args_ptr).length = length;
-        #[allow(clippy::cast_possible_truncation)]
-        // count is bounded by target slice length
-        {
-            (*args_ptr).dest_count = count as u16;
-        }
+        // SAFETY: count is validated to fit in u16 above.
+        (*args_ptr).dest_count = count as u16;
 
         let info_slice = (*args_ptr).info.as_mut_slice(count);
         for (i, target) in targets.iter().enumerate() {
