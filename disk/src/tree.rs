@@ -953,7 +953,7 @@ impl TreeBlock {
             Self::Leaf { items, data, .. } => {
                 let item = items.get(index)?;
                 let start = HEADER_SIZE + item.offset as usize;
-                let end = start + item.size as usize;
+                let end = start.checked_add(item.size as usize)?;
                 if end <= data.len() {
                     Some(&data[start..end])
                 } else {
