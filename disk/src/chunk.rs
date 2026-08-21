@@ -919,6 +919,8 @@ pub fn parse_chunk_item(
 /// access to the full chunk tree (system profile chunks).
 #[must_use]
 pub fn seed_from_sys_chunk_array(array: &[u8], size: u32) -> ChunkTreeCache {
+    // Clamp size to array length to prevent out-of-bounds panic.
+    let size = size.min(array.len() as u32);
     let array = &array[..size as usize];
     let mut cache = ChunkTreeCache::default();
 
