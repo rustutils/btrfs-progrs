@@ -416,7 +416,9 @@ fn read_raw_superblock(
 
     // SAFETY: btrfs_super_block is #[repr(C, packed)], exactly 4096 bytes,
     // and all-zeroes is a valid bit pattern. We just read into a byte buffer
-    // so alignment is not an issue for the copy.
+    // so alignment is not an issue for the copy. The static assertion below
+    // ensures that the struct size matches the buffer size we read.
+    const _: () = assert!(core::mem::size_of::<raw::btrfs_super_block>() == 4096);
     let sb: raw::btrfs_super_block =
         unsafe { std::ptr::read_unaligned(buf.as_ptr().cast()) };
     Ok(sb)
