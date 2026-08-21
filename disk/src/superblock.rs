@@ -33,12 +33,17 @@ const SUPER_MIRROR_SHIFT: u32 = 12;
 /// Compute the byte offset of the superblock mirror at `index`.
 ///
 /// Mirror 0 is at 64 KiB, mirror 1 at 64 MiB, mirror 2 at 256 GiB.
+/// For invalid indices (>= 3), returns `u64::MAX` to prevent overflow.
 #[must_use]
 pub fn super_mirror_offset(index: u32) -> u64 {
     if index == 0 {
         SUPER_INFO_OFFSET
+    } else if index >= SUPER_MIRROR_MAX {
+        // Saturate to max value for out-of-bounds indices.
+        u64::MAX
     } else {
         // 16 KiB << (12 * index)
+        // Safe because index is in [1, SUPER_MIRROR_MAX).
         (16 * 1024u64) << (SUPER_MIRROR_SHIFT * index)
     }
 }
