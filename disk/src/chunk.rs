@@ -298,7 +298,7 @@ impl ChunkTreeCache {
     pub fn resolve(&self, logical: u64) -> Option<(u64, u64)> {
         let mapping = self.lookup(logical)?;
         let offset_within_chunk = logical - mapping.logical;
-        let stripe = &mapping.stripes[0];
+        let stripe = mapping.stripes.first()?;
         Some((stripe.devid, stripe.offset + offset_within_chunk))
     }
 
