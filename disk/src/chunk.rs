@@ -583,6 +583,10 @@ fn fill_row_columns(
 /// num_stripes`, and (for RAID6) the second parity column is one slot
 /// to its left.
 fn parity_columns(num_stripes: u64, nparity: u64, phys_row: u64) -> (u16, u16) {
+    // Guard against division by zero and underflow
+    if num_stripes == 0 || num_stripes <= nparity {
+        return (0, 0);
+    }
     debug_assert!(num_stripes > nparity);
     let n = num_stripes;
     let q = (2 * n - 1 - (phys_row % n)) % n;
