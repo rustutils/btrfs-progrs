@@ -634,8 +634,12 @@ pub fn read_chunk_tree<R: Read + Seek>(
                 if item.key.key_type != KeyType::ChunkItem {
                     continue;
                 }
-                let item_data = &data[mem::size_of::<raw::btrfs_header>()
-                    + item.offset as usize..];
+                let item_start = mem::size_of::<raw::btrfs_header>()
+                    + item.offset as usize;
+                if item_start >= data.len() {
+                    continue;
+                }
+                let item_data = &data[item_start..];
                 if let Some((mapping, _)) =
                     chunk::parse_chunk_item(item_data, item.key.offset)
                 {
