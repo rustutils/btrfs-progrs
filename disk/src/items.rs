@@ -711,7 +711,7 @@ impl RootItem {
     #[allow(clippy::too_many_lines)]
     pub fn parse(data: &[u8]) -> Option<Self> {
         let inode_size = mem::size_of::<raw::btrfs_inode_item>();
-        if data.len() < inode_size + 8 {
+        if data.len() < inode_size + 60 {
             return None;
         }
 
