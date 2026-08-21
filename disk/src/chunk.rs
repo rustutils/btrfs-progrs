@@ -723,6 +723,12 @@ fn plan_parity_write(
     let stripe_len = mapping.stripe_len;
     debug_assert!(stripe_len > 0, "chunk stripe_len must be non-zero");
     debug_assert!(n > nparity, "RAID5/6 needs more stripes than parity");
+
+    // Validate parameters to prevent division by zero and underflow
+    if stripe_len == 0 || n <= nparity {
+        return None;
+    }
+
     let stripe_len_u32 = u32::try_from(stripe_len).ok()?;
 
     if len == 0 {
@@ -806,6 +812,11 @@ fn plan_parity_read(
     let stripe_len = mapping.stripe_len;
     debug_assert!(stripe_len > 0, "chunk stripe_len must be non-zero");
     debug_assert!(n > nparity, "RAID5/6 needs more stripes than parity");
+
+    // Validate parameters to prevent division by zero and underflow
+    if stripe_len == 0 || n <= nparity {
+        return None;
+    }
 
     if len == 0 {
         return Some(Vec::new());
