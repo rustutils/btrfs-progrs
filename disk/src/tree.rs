@@ -914,6 +914,9 @@ impl TreeBlock {
         let nritems = header.nritems as usize;
 
         if header.level > 0 {
+            // Cap nritems to the maximum that can fit in the buffer
+            let max_ptrs = buf.len().saturating_sub(HEADER_SIZE) / KEY_PTR_SIZE;
+            let nritems = nritems.min(max_ptrs);
             let mut ptrs = Vec::with_capacity(nritems);
             for i in 0..nritems {
                 let off = HEADER_SIZE + i * KEY_PTR_SIZE;
@@ -921,6 +924,9 @@ impl TreeBlock {
             }
             Self::Node { header, ptrs }
         } else {
+            // Cap nritems to the maximum that can fit in the buffer
+            let max_items = buf.len().saturating_sub(HEADER_SIZE) / ITEM_SIZE;
+            let nritems = nritems.min(max_items);
             let mut items = Vec::with_capacity(nritems);
             for i in 0..nritems {
                 let off = HEADER_SIZE + i * ITEM_SIZE;
